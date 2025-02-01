@@ -1,8 +1,8 @@
-# github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da
-## explicit
+# github.com/armon/go-metrics v0.4.1
+## explicit; go 1.12
 github.com/armon/go-metrics
-# github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c
-## explicit
+# github.com/google/btree v1.1.3
+## explicit; go 1.18
 github.com/google/btree
 # github.com/google/go-cmp v0.6.0
 ## explicit; go 1.13
@@ -15,25 +15,29 @@ github.com/google/go-cmp/cmp/internal/value
 # github.com/google/uuid v1.6.0
 ## explicit
 github.com/google/uuid
-# github.com/hashicorp/errwrap v1.0.0
+# github.com/hashicorp/errwrap v1.1.0
 ## explicit
 github.com/hashicorp/errwrap
-# github.com/hashicorp/go-immutable-radix v1.0.0
+# github.com/hashicorp/go-immutable-radix v1.3.1
 ## explicit
 github.com/hashicorp/go-immutable-radix
-# github.com/hashicorp/go-msgpack/v2 v2.1.1
+# github.com/hashicorp/go-metrics v0.5.4
+## explicit; go 1.12
+github.com/hashicorp/go-metrics
+github.com/hashicorp/go-metrics/compat
+# github.com/hashicorp/go-msgpack/v2 v2.1.2
 ## explicit; go 1.19
 github.com/hashicorp/go-msgpack/v2/codec
-# github.com/hashicorp/go-multierror v1.0.0
-## explicit
+# github.com/hashicorp/go-multierror v1.1.1
+## explicit; go 1.13
 github.com/hashicorp/go-multierror
-# github.com/hashicorp/go-sockaddr v1.0.0
-## explicit
+# github.com/hashicorp/go-sockaddr v1.0.7
+## explicit; go 1.19
 github.com/hashicorp/go-sockaddr
-# github.com/hashicorp/golang-lru v0.5.0
-## explicit
+# github.com/hashicorp/golang-lru v1.0.2
+## explicit; go 1.12
 github.com/hashicorp/golang-lru/simplelru
-# github.com/hashicorp/memberlist v0.5.1
+# github.com/hashicorp/memberlist v0.5.3
 ## explicit; go 1.20
 github.com/hashicorp/memberlist
 # github.com/lib/pq v1.10.9
@@ -41,16 +45,16 @@ github.com/hashicorp/memberlist
 github.com/lib/pq
 github.com/lib/pq/oid
 github.com/lib/pq/scram
-# github.com/miekg/dns v1.1.26
-## explicit; go 1.12
+# github.com/miekg/dns v1.1.63
+## explicit; go 1.19
 github.com/miekg/dns
 # github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529
 ## explicit
 github.com/sean-/seed
-# golang.org/x/crypto v0.28.0
-## explicit; go 1.20
-golang.org/x/crypto/ed25519
-# golang.org/x/net v0.30.0
+# golang.org/x/mod v0.22.0
+## explicit; go 1.22.0
+golang.org/x/mod/semver
+# golang.org/x/net v0.34.0
 ## explicit; go 1.18
 golang.org/x/net/bpf
 golang.org/x/net/http/httpguts
@@ -63,21 +67,43 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/ipv4
 golang.org/x/net/ipv6
 golang.org/x/net/trace
-# golang.org/x/sys v0.26.0
+# golang.org/x/sync v0.10.0
+## explicit; go 1.18
+golang.org/x/sync/errgroup
+# golang.org/x/sys v0.29.0
 ## explicit; go 1.18
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.19.0
+# golang.org/x/text v0.21.0
 ## explicit; go 1.18
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38
-## explicit; go 1.21
+# golang.org/x/tools v0.29.0
+## explicit; go 1.22.0
+golang.org/x/tools/go/gcexportdata
+golang.org/x/tools/go/packages
+golang.org/x/tools/go/types/objectpath
+golang.org/x/tools/go/types/typeutil
+golang.org/x/tools/internal/aliases
+golang.org/x/tools/internal/event
+golang.org/x/tools/internal/event/core
+golang.org/x/tools/internal/event/keys
+golang.org/x/tools/internal/event/label
+golang.org/x/tools/internal/gcimporter
+golang.org/x/tools/internal/gocommand
+golang.org/x/tools/internal/packagesinternal
+golang.org/x/tools/internal/pkgbits
+golang.org/x/tools/internal/stdlib
+golang.org/x/tools/internal/typeparams
+golang.org/x/tools/internal/typesinternal
+golang.org/x/tools/internal/versions
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20250127172529-29210b9bc287
+## explicit; go 1.22
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.67.1
-## explicit; go 1.21
+# google.golang.org/grpc v1.70.0
+## explicit; go 1.22
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
@@ -85,6 +111,8 @@ google.golang.org/grpc/balancer
 google.golang.org/grpc/balancer/base
 google.golang.org/grpc/balancer/grpclb/state
 google.golang.org/grpc/balancer/pickfirst
+google.golang.org/grpc/balancer/pickfirst/internal
+google.golang.org/grpc/balancer/pickfirst/pickfirstleaf
 google.golang.org/grpc/balancer/roundrobin
 google.golang.org/grpc/binarylog/grpc_binarylog_v1
 google.golang.org/grpc/channelz
@@ -138,7 +166,7 @@ google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
 google.golang.org/grpc/test/bufconn
-# google.golang.org/protobuf v1.35.1
+# google.golang.org/protobuf v1.36.4
 ## explicit; go 1.21
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
@@ -162,6 +190,7 @@ google.golang.org/protobuf/internal/impl
 google.golang.org/protobuf/internal/msgfmt
 google.golang.org/protobuf/internal/order
 google.golang.org/protobuf/internal/pragma
+google.golang.org/protobuf/internal/protolazy
 google.golang.org/protobuf/internal/set
 google.golang.org/protobuf/internal/strs
 google.golang.org/protobuf/internal/version
