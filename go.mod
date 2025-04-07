@@ -24,6 +24,7 @@ require (
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/miekg/dns v1.1.64 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
+	go.etcd.io/bbolt v1.4.0 // indirect
 	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/tools v0.31.0 // indirect
