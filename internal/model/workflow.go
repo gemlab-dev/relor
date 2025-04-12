@@ -19,10 +19,12 @@ const (
 )
 
 type Workflow struct {
-	ID          uuid.UUID
-	CurrentNode string
-	Status      WorkflowStatus
-	Graph       *Graph
+	ID               uuid.UUID
+	CurrentNode      string
+	Status           WorkflowStatus
+	Graph            *Graph
+	LastTransitionId *int64
+	// NextActionAt time.Time
 }
 
 func NewWorkflow(id uuid.UUID, g *Graph) *Workflow {
@@ -44,10 +46,11 @@ func (w Workflow) ToProto() (*pb.Workflow, error) {
 		return nil, fmt.Errorf("failed to convert graph to proto: %w", err)
 	}
 	return &pb.Workflow{
-		Id:          w.ID.String(),
-		CurrentNode: w.CurrentNode,
-		Status:      workflowStatusToProto(w.Status),
-		Graph:       pbGraph,
+		Id:               w.ID.String(),
+		CurrentNode:      w.CurrentNode,
+		Status:           workflowStatusToProto(w.Status),
+		Graph:            pbGraph,
+		LastTransitionId: w.LastTransitionId,
 	}, nil
 }
 
@@ -67,6 +70,7 @@ func (w *Workflow) FromProto(pbWorkflow *pb.Workflow) error {
 		return fmt.Errorf("failed to convert graph from proto: %w", err)
 	}
 	w.Graph = g
+	w.LastTransitionId = pbWorkflow.LastTransitionId
 	return nil
 }
 
