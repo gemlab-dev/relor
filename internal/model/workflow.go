@@ -19,11 +19,12 @@ const (
 )
 
 type Workflow struct {
-	ID               uuid.UUID
-	CurrentNode      string
-	Status           WorkflowStatus
-	Graph            *Graph
-	LastTransitionId *int64
+	ID          uuid.UUID
+	CurrentNode string
+	Status      WorkflowStatus
+	Graph       *Graph
+
+	LastTransitionId uint64
 	// NextActionAt time.Time
 }
 
@@ -46,31 +47,37 @@ func (w Workflow) ToProto() (*pb.Workflow, error) {
 		return nil, fmt.Errorf("failed to convert graph to proto: %w", err)
 	}
 	return &pb.Workflow{
-		Id:               w.ID.String(),
-		CurrentNode:      w.CurrentNode,
-		Status:           workflowStatusToProto(w.Status),
-		Graph:            pbGraph,
-		LastTransitionId: w.LastTransitionId,
+		Id:     w.ID.String(),
+		Status: workflowStatusToProto(w.Status),
+		Graph:  pbGraph,
 	}, nil
 }
 
-func (w *Workflow) FromProto(pbWorkflow *pb.Workflow) error {
+func (w *Workflow) FromProto(pbWorkflow *pb.Workflow, currentNode string, lastTnID uint64) error {
 	if w == nil {
 		return nil
 	}
+
 	var err error
 	w.ID, err = uuid.Parse(pbWorkflow.Id)
 	if err != nil {
 		return fmt.Errorf("failed to parse workflow ID: %w", err)
 	}
-	w.CurrentNode = pbWorkflow.CurrentNode
 	w.Status = protoToWorkflowStatus(pbWorkflow.Status)
+
 	g := &Graph{}
 	if err := g.FromProto(pbWorkflow.Graph); err != nil {
 		return fmt.Errorf("failed to convert graph from proto: %w", err)
 	}
+	if currentNode == "" {
+		currentNode = g.Head()
+	} else if !g.HasNode(currentNode) {
+		return fmt.Errorf("current node %q is not found in the graph", currentNode)
+	}
+	w.CurrentNode = currentNode
+
 	w.Graph = g
-	w.LastTransitionId = pbWorkflow.LastTransitionId
+	w.LastTransitionId = lastTnID
 	return nil
 }
 

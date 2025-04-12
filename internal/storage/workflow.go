@@ -65,9 +65,10 @@ func (s *WorkflowStorage) CreateWorkflow(ctx context.Context, w model.Workflow) 
 }
 
 type NextAction struct {
-	ID                uuid.UUID
-	Label             string
-	CurrentTransition uuid.UUID
+	ID                  uuid.UUID
+	Label               string
+	CurrentTransition   uuid.UUID
+	LastKnownTransition uint64
 }
 
 func (s *WorkflowStorage) UpdateNextAction(ctx context.Context, na NextAction) error {
