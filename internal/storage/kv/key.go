@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// TransactionKey generates a key for a transaction using the given prefix and sequence ID.
+// TransitionKey generates a key for a transition using the given prefix and sequence ID.
 // The sequence ID is negated to enforce descending order when sorted.
 func TransitionKey(prefix []byte, seqID uint64) []byte {
 	descBytes := make([]byte, 8)
