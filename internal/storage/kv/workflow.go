@@ -82,19 +82,19 @@ func (s *WorkflowStorage) UpdateNextAction(ctx context.Context, na storage.NextA
 			return fmt.Errorf("workflow not found: %s", na.ID)
 		}
 
-		if wf.LastTransitionId != na.LastKnownTransition {
+		if wf.LastTransitionId() != na.LastKnownTransition {
 			return fmt.Errorf("current transition ID does not match workflow last transition ID")
 		}
 
 		// Validate current action and get next node.
-		nextNode, err := wf.Graph.NextNodeID(wf.CurrentNode, na.Label)
+		nextNode, err := wf.Graph.NextNodeID(wf.CurrentNode(), na.Label)
 		if err != nil {
 			return fmt.Errorf("failed to get next node: %w", err)
 		}
 
 		newTnPb := pb.WorkflowTransition{
-			Id:        wf.LastTransitionId + 1,
-			FromNode:  wf.CurrentNode,
+			Id:        wf.LastTransitionId() + 1,
+			FromNode:  wf.CurrentNode(),
 			ToNode:    nextNode,
 			Label:     na.Label,
 			Timestamp: time.Now().Unix(),

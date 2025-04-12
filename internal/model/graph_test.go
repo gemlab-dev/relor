@@ -230,3 +230,25 @@ func TestGetOutLabelsAtLeaf(t *testing.T) {
 		t.Errorf("unexpected out labels: %v; want empty", got)
 	}
 }
+
+func TestHasNode(t *testing.T) {
+	txt := `
+		start: "a"
+		nodes { id: "a" }
+		nodes { id: "b" }
+	`
+	pb := &gpb.Graph{}
+	if err := prototext.Unmarshal([]byte(txt), pb); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	g := &Graph{}
+	if err := g.FromProto(pb); err != nil {
+		t.Fatalf("failed to load graph: %v", err)
+	}
+	if !g.HasNode("a") {
+		t.Errorf("unexpected result; node a should exist")
+	}
+	if g.HasNode("c") {
+		t.Errorf("unexpected result; node c should not exist")
+	}
+}

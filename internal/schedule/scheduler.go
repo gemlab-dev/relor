@@ -132,14 +132,14 @@ func (s *Scheduler) poll(ctx context.Context) error {
 }
 
 func (s *Scheduler) schedule(ctx context.Context, w model.Workflow) error {
-	labels, err := w.Graph.OutLabels(w.CurrentNode)
+	labels, err := w.Graph.OutLabels(w.CurrentNode())
 	if err != nil {
 		return fmt.Errorf("failed to get out labels: %w", err)
 	}
 
 	// Get the timeout for this job.
 	// When the timeout is reached, a new job for the same action will be created.
-	timeout, err := w.Graph.Timeout(w.CurrentNode)
+	timeout, err := w.Graph.Timeout(w.CurrentNode())
 	if err != nil {
 		return fmt.Errorf("failed to get timeout: %w", err)
 	}
@@ -161,7 +161,7 @@ func (s *Scheduler) schedule(ctx context.Context, w model.Workflow) error {
 		Id: uuid.NewString(),
 		Reference: &pb.Reference{
 			WorkflowId:     w.ID.String(),
-			WorkflowAction: w.CurrentNode,
+			WorkflowAction: w.CurrentNode(),
 			TransitionId:   tid.String(),
 		},
 		ResultLabels: labels,

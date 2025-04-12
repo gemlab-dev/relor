@@ -54,7 +54,7 @@ func (s *WorkflowStorage) CreateWorkflow(ctx context.Context, w model.Workflow) 
 	}
 	arg := sqlc.CreateWorkflowParams{
 		ID:          w.ID,
-		CurrentNode: w.CurrentNode,
+		CurrentNode: w.CurrentNode(),
 		Status:      string(w.Status),
 		Graph:       b,
 	}
@@ -112,13 +112,13 @@ func (s *WorkflowStorage) updateNextActionTxn(ctx context.Context, tx sqlc.DBTX,
 	}
 
 	// Validate current action and get next node.
-	nextNode, err := wf.Graph.NextNodeID(wf.CurrentNode, na.Label)
+	nextNode, err := wf.Graph.NextNodeID(wf.CurrentNode(), na.Label)
 	if err != nil {
 		return fmt.Errorf("failed to get next node: %w", err)
 	}
 
 	// Create transitions.
-	if err := s.createTransition(ctx, tx, na.ID, wf.CurrentNode, nextNode, na.Label); err != nil {
+	if err := s.createTransition(ctx, tx, na.ID, wf.CurrentNode(), nextNode, na.Label); err != nil {
 		return fmt.Errorf("failed to update transitions: %w", err)
 	}
 
@@ -308,10 +308,11 @@ func workflowToModel(w sqlc.Workflow) (model.Workflow, error) {
 	if err := g.FromProto(gpb); err != nil {
 		return model.Workflow{}, fmt.Errorf("failed to build graph: %w", err)
 	}
-	return model.Workflow{
-		ID:          w.ID,
-		CurrentNode: w.CurrentNode,
-		Status:      model.WorkflowStatus(w.Status),
-		Graph:       g,
-	}, nil
+	m := model.Workflow{
+		ID:     w.ID,
+		Status: model.WorkflowStatus(w.Status),
+		Graph:  g,
+	}
+	m.SetCurrentNode(w.CurrentNode)
+	return m, nil
 }

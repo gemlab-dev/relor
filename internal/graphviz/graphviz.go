@@ -74,13 +74,13 @@ func Dot(w model.Workflow, t *model.Transition) (string, error) {
 			seenNodes[k.to] = struct{}{}
 		}
 	}
-	delete(seenNodes, w.CurrentNode)
+	delete(seenNodes, w.CurrentNode())
 
 	//Prepare template data.
 	data := dotData{
 		VisitedNodes: make([]string, 0, len(seenNodes)),
 		StartNode:    w.Graph.Head(),
-		CurrentNode:  w.CurrentNode,
+		CurrentNode:  w.CurrentNode(),
 		Edges:        make([]edgeData, 0, len(counts)),
 	}
 	for _, key := range keySec {

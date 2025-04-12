@@ -19,13 +19,41 @@ const (
 )
 
 type Workflow struct {
-	ID          uuid.UUID
-	CurrentNode string
-	Status      WorkflowStatus
-	Graph       *Graph
+	ID     uuid.UUID
+	Status WorkflowStatus
+	Graph  *Graph
 
-	LastTransitionId uint64
+	currentNode      string
+	lastTransitionId uint64
 	// NextActionAt time.Time
+}
+
+func (w *Workflow) CurrentNode() string {
+	if w == nil {
+		return ""
+	}
+	return w.currentNode
+}
+
+// TODO: It should be more explicit that CurrentNode can't be overwritten.
+func (w *Workflow) SetCurrentNode(node string) {
+	if w == nil {
+		return
+	}
+	if w.Graph == nil {
+		return
+	}
+	if !w.Graph.HasNode(node) {
+		return
+	}
+	w.currentNode = node
+}
+
+func (w *Workflow) LastTransitionId() uint64 {
+	if w == nil {
+		return 0
+	}
+	return w.lastTransitionId
 }
 
 func NewWorkflow(id uuid.UUID, g *Graph) *Workflow {
@@ -33,8 +61,8 @@ func NewWorkflow(id uuid.UUID, g *Graph) *Workflow {
 		ID: id,
 		// TODO: set status to WorkflowStatusPending to stage workflows before running.
 		Status:      WorkflowStatusRunning,
-		CurrentNode: g.Head(),
 		Graph:       g,
+		currentNode: g.Head(),
 	}
 }
 
@@ -74,10 +102,10 @@ func (w *Workflow) FromProto(pbWorkflow *pb.Workflow, currentNode string, lastTn
 	} else if !g.HasNode(currentNode) {
 		return fmt.Errorf("current node %q is not found in the graph", currentNode)
 	}
-	w.CurrentNode = currentNode
+	w.currentNode = currentNode
 
 	w.Graph = g
-	w.LastTransitionId = lastTnID
+	w.lastTransitionId = lastTnID
 	return nil
 }
 

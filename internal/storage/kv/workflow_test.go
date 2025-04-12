@@ -55,16 +55,10 @@ func TestWorkflowKVStorage(t *testing.T) {
 	workflowID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	t.Run("Create and Get Workflow", func(t *testing.T) {
-		workflow := model.Workflow{
-			ID:               workflowID,
-			CurrentNode:      "a",
-			Status:           model.WorkflowStatusRunning,
-			Graph:            g,
-			LastTransitionId: 0,
-		}
+		workflow := model.NewWorkflow(workflowID, g)
 		ctx := context.Background()
 
-		if err := kv.CreateWorkflow(ctx, workflow); err != nil {
+		if err := kv.CreateWorkflow(ctx, *workflow); err != nil {
 			t.Fatalf("failed to create workflow: %v", err)
 		}
 		na := storage.NextAction{
@@ -88,14 +82,14 @@ func TestWorkflowKVStorage(t *testing.T) {
 		if retrievedWorkflow.ID != workflow.ID {
 			t.Errorf("expected workflow ID %v, got %v", workflow.ID, retrievedWorkflow.ID)
 		}
-		if retrievedWorkflow.CurrentNode != "b" {
-			t.Errorf("expected current node b, got %v", retrievedWorkflow.CurrentNode)
+		if retrievedWorkflow.CurrentNode() != "b" {
+			t.Errorf("expected current node b, got %v", retrievedWorkflow.CurrentNode())
 		}
 		if retrievedWorkflow.Status != model.WorkflowStatusCompleted {
 			t.Errorf("expected status %v, got %v", model.WorkflowStatusCompleted, retrievedWorkflow.Status)
 		}
-		if retrievedWorkflow.LastTransitionId != 2 {
-			t.Errorf("expected last transition ID 2, got %v", retrievedWorkflow.LastTransitionId)
+		if retrievedWorkflow.LastTransitionId() != 2 {
+			t.Errorf("expected last transition ID 2, got %v", retrievedWorkflow.LastTransitionId())
 		}
 
 		tn, err := kv.GetHistory(ctx, workflowID)
@@ -119,14 +113,9 @@ func TestWorkflowKVStorage(t *testing.T) {
 	t.Run("Create Duplicate Workflow", func(t *testing.T) {
 		ctx := context.Background()
 		workflowID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
-		workflow := model.Workflow{
-			ID:          workflowID,
-			CurrentNode: "a",
-			Status:      model.WorkflowStatusRunning,
-			Graph:       g,
-		}
+		workflow := model.NewWorkflow(workflowID, g)
 		// Attempt to create a duplicate workflow.
-		err := kv.CreateWorkflow(ctx, workflow)
+		err := kv.CreateWorkflow(ctx, *workflow)
 		if err == nil {
 			t.Fatalf("expected error for duplicate workflow, got nil")
 		}
