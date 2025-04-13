@@ -83,7 +83,7 @@ func (w Workflow) ToProto() (*pb.Workflow, error) {
 
 func (w *Workflow) FromProto(pbWorkflow *pb.Workflow, currentNode string, lastTnID uint64) error {
 	if w == nil {
-		return nil
+		return fmt.Errorf("cannot deserialize into a nil Workflow")
 	}
 
 	var err error
