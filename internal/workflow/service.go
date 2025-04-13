@@ -72,7 +72,7 @@ func (s *Server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetResponse, e
 	return &pb.GetResponse{
 		State: &pb.WorkflowState{
 			Status:      string(w.Status),
-			CurrentNode: w.CurrentNode,
+			CurrentNode: w.CurrentNode(),
 		},
 		TransitionId: t.String(),
 	}, nil

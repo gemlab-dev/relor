@@ -132,6 +132,14 @@ func (g *Graph) Head() string {
 	return g.root.id
 }
 
+func (g *Graph) HasNode(nodeID string) bool {
+	if g == nil || g.idx == nil {
+		return false
+	}
+	_, ok := g.idx[nodeID]
+	return ok
+}
+
 func indexNodes(g *gpb.Graph) (map[string]*node, error) {
 	i := make(map[string]*node, len(g.Nodes))
 	for _, n := range g.Nodes {

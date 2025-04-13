@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package kvstore;
+option go_package="github.com/gemlab-dev/relor/internal/gen/pb/db";
+
+import "graph/graph.proto";
+
+enum WorkflowStatus {
+    WORKFLOW_STATUS_UNSPECIFIED = 0;
+    WORKFLOW_STATUS_PENDING = 1;
+    WORKFLOW_STATUS_RUNNING = 2;
+    WORKFLOW_STATUS_COMPLETED = 3;
+    WORKFLOW_STATUS_FAILED = 4;
+}
+
+message Workflow {
+    string id = 1;
+    WorkflowStatus status = 3;
+    graph.Graph graph = 4;
+}
+
+message WorkflowTransition {
+    // Sequence number of the transition.
+    // This is a monotonically increasing number that is unique to the workflow.
+    // It is not unique across workflows.
+    uint64 id = 1;
+
+    string from_node = 3;
+    string to_node = 4;
+    string label = 5;
+    int64 timestamp = 6;
+}
+
