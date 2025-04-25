@@ -2,8 +2,10 @@ package model
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gemlab-dev/relor/gen/pb/db"
 )
@@ -19,13 +21,13 @@ const (
 )
 
 type Workflow struct {
-	ID     uuid.UUID
-	Status WorkflowStatus
-	Graph  *Graph
+	ID           uuid.UUID
+	Status       WorkflowStatus
+	Graph        *Graph
+	NextActionAt time.Time
 
 	currentNode      string
 	lastTransitionId uint64
-	// NextActionAt time.Time
 }
 
 func (w *Workflow) CurrentNode() string {
@@ -56,13 +58,14 @@ func (w *Workflow) LastTransitionId() uint64 {
 	return w.lastTransitionId
 }
 
-func NewWorkflow(id uuid.UUID, g *Graph) *Workflow {
+func NewWorkflow(id uuid.UUID, g *Graph, nextActionAt time.Time) *Workflow {
 	return &Workflow{
 		ID: id,
 		// TODO: set status to WorkflowStatusPending to stage workflows before running.
-		Status:      WorkflowStatusRunning,
-		Graph:       g,
-		currentNode: g.Head(),
+		Status:       WorkflowStatusRunning,
+		Graph:        g,
+		currentNode:  g.Head(),
+		NextActionAt: nextActionAt,
 	}
 }
 
@@ -75,9 +78,10 @@ func (w Workflow) ToProto() (*pb.Workflow, error) {
 		return nil, fmt.Errorf("failed to convert graph to proto: %w", err)
 	}
 	return &pb.Workflow{
-		Id:     w.ID.String(),
-		Status: workflowStatusToProto(w.Status),
-		Graph:  pbGraph,
+		Id:                  w.ID.String(),
+		Status:              workflowStatusToProto(w.Status),
+		Graph:               pbGraph,
+		NextActionTimestamp: timestamppb.New(w.NextActionAt),
 	}, nil
 }
 
@@ -106,6 +110,7 @@ func (w *Workflow) FromProto(pbWorkflow *pb.Workflow, currentNode string, lastTn
 
 	w.Graph = g
 	w.lastTransitionId = lastTnID
+	w.NextActionAt = pbWorkflow.GetNextActionTimestamp().AsTime()
 	return nil
 }
 

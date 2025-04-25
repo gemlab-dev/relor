@@ -4,6 +4,7 @@ package kvstore;
 option go_package="github.com/gemlab-dev/relor/internal/gen/pb/db";
 
 import "graph/graph.proto";
+import "google/protobuf/timestamp.proto";
 
 enum WorkflowStatus {
     WORKFLOW_STATUS_UNSPECIFIED = 0;
@@ -17,6 +18,7 @@ message Workflow {
     string id = 1;
     WorkflowStatus status = 3;
     graph.Graph graph = 4;
+    google.protobuf.Timestamp next_action_timestamp = 5;
 }
 
 message WorkflowTransition {
@@ -28,6 +30,6 @@ message WorkflowTransition {
     string from_node = 3;
     string to_node = 4;
     string label = 5;
-    int64 timestamp = 6;
+    google.protobuf.Timestamp timestamp = 6;
 }
 

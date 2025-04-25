@@ -2,6 +2,7 @@ package model
 
 import (
 	"testing"
+	"time"
 
 	wpb "github.com/gemlab-dev/relor/gen/pb/db"
 	gpb "github.com/gemlab-dev/relor/gen/pb/graph"
@@ -71,7 +72,7 @@ func TestNewWorkflow(t *testing.T) {
 	if err := g.FromProto(pb); err != nil {
 		t.Fatalf("failed to convert from proto: %v", err)
 	}
-	wf := NewWorkflow(id, g)
+	wf := NewWorkflow(id, g, time.Now())
 	if wf == nil {
 		t.Fatal("expected non-nil workflow")
 	}
