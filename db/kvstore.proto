@@ -33,3 +33,6 @@ message WorkflowTransition {
     google.protobuf.Timestamp timestamp = 6;
 }
 
+message Schedule {
+    string workflow_id = 1;
+}
