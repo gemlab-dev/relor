@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"time"
 
 	pb "github.com/gemlab-dev/relor/gen/pb/api"
 	"github.com/gemlab-dev/relor/internal/graphviz"
@@ -43,7 +44,7 @@ func (s *Server) Run(ctx context.Context, in *pb.RunRequest) (*pb.RunResponse, e
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to parse id: %v", err)
 	}
-	w := model.NewWorkflow(id, &g)
+	w := model.NewWorkflow(id, &g, time.Now())
 	s.logger.InfoContext(ctx, "Running workflow", "w", w)
 	if err := s.store.CreateWorkflow(ctx, *w); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create workflow: %v", err)

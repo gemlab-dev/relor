@@ -13,20 +13,26 @@ import (
 	"github.com/google/uuid"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+const actionDelay = 1 * time.Second
+
+type timeProvider func() time.Time
 
 type WorkflowStorage struct {
 	db         *bolt.DB
 	bucketName string
+	now        timeProvider
 }
 
-func NewWorkflowStorage(path, bucketName string) (*WorkflowStorage, error) {
+func NewWorkflowStorage(path, bucketName string, now timeProvider) (*WorkflowStorage, error) {
 	opts := &bolt.Options{Timeout: 1 * time.Second}
 	db, err := bolt.Open(path, 0600, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open KV store: %v", err)
 	}
-	return &WorkflowStorage{db: db, bucketName: bucketName}, nil
+	return &WorkflowStorage{db: db, bucketName: bucketName, now: now}, nil
 }
 
 func (w *WorkflowStorage) Close() error {
@@ -34,6 +40,7 @@ func (w *WorkflowStorage) Close() error {
 }
 
 func (s *WorkflowStorage) CreateWorkflow(ctx context.Context, w model.Workflow) error {
+	// TODO: Set the NextActionAt to the current time + actionDelay
 	return s.db.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists([]byte(s.bucketName))
 		if err != nil {
@@ -97,7 +104,7 @@ func (s *WorkflowStorage) UpdateNextAction(ctx context.Context, na storage.NextA
 			FromNode:  wf.CurrentNode(),
 			ToNode:    nextNode,
 			Label:     na.Label,
-			Timestamp: time.Now().Unix(),
+			Timestamp: timestamppb.New(s.now()),
 		}
 		// Write transition
 		tnKey, err := transitionKey(na.ID, newTnPb.Id)
@@ -119,6 +126,7 @@ func (s *WorkflowStorage) UpdateNextAction(ctx context.Context, na storage.NextA
 		if len(nextLabels) == 0 {
 			wf.Status = model.WorkflowStatusCompleted
 		}
+		wf.NextActionAt = s.now().Add(actionDelay)
 
 		return s.saveWorkflow(b, *wf)
 	})
@@ -182,7 +190,7 @@ func (s *WorkflowStorage) GetHistory(ctx context.Context, workflowID uuid.UUID) 
 				From:    tpb.FromNode,
 				To:      tpb.ToNode,
 				Label:   tpb.Label,
-				Created: time.Unix(tpb.Timestamp, 0),
+				Created: tpb.Timestamp.AsTime(),
 			})
 		}
 		return nil
@@ -194,7 +202,23 @@ func (s *WorkflowStorage) GetHistory(ctx context.Context, workflowID uuid.UUID) 
 }
 
 func (s *WorkflowStorage) UpdateTimeout(ctx context.Context, id uuid.UUID, timeout time.Duration) error {
-	return fmt.Errorf("not implemented")
+	return s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return fmt.Errorf("bucket not found: %s", s.bucketName)
+		}
+
+		wf, err := s.loadWorkflow(b, id)
+		if err != nil {
+			return fmt.Errorf("failed to load workflow: %w", err)
+		}
+		if wf == nil {
+			return fmt.Errorf("workflow not found: %s", id)
+		}
+
+		wf.NextActionAt = s.now().Add(timeout).Add(actionDelay)
+		return s.saveWorkflow(b, *wf)
+	})
 }
 
 func (s *WorkflowStorage) GetNextWorkflows(ctx context.Context) ([]model.Workflow, error) {

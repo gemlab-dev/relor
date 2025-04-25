@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/gemlab-dev/relor/gen/sqlc"
 	"github.com/gemlab-dev/relor/internal/model"
@@ -165,7 +166,7 @@ func TestCreateWorkflow(t *testing.T) {
 	id := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	ctx := context.Background()
 	ws := NewWorkflowStorage(newFakeDBQuery(), &fakeDBTX{})
-	want := model.NewWorkflow(id, g)
+	want := model.NewWorkflow(id, g, time.Now())
 	if err := ws.CreateWorkflow(ctx, *want); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -210,7 +211,7 @@ func TestUpdateWorkflow(t *testing.T) {
 	ctx := context.Background()
 	dbtx := &fakeDBTX{}
 	wfstore := NewWorkflowStorage(newFakeDBQuery(), dbtx)
-	w := model.NewWorkflow(id, g)
+	w := model.NewWorkflow(id, g, time.Now())
 	if err := wfstore.CreateWorkflow(ctx, *w); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

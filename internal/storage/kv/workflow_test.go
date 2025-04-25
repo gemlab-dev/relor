@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	pb "github.com/gemlab-dev/relor/gen/pb/graph"
 	"github.com/gemlab-dev/relor/internal/model"
@@ -26,7 +27,12 @@ func TestWorkflowKVStorage(t *testing.T) {
 		}
 	}()
 
-	kv, err := kv.NewWorkflowStorage(tempFile.Name(), "testBucket")
+	ts := time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC)
+	now := func() time.Time {
+		return ts
+	}
+
+	kv, err := kv.NewWorkflowStorage(tempFile.Name(), "testBucket", now)
 	if err != nil {
 		t.Fatalf("failed to initialize storage: %v", err)
 	}
@@ -55,7 +61,7 @@ func TestWorkflowKVStorage(t *testing.T) {
 	workflowID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	t.Run("Create and Get Workflow", func(t *testing.T) {
-		workflow := model.NewWorkflow(workflowID, g)
+		workflow := model.NewWorkflow(workflowID, g, ts)
 		ctx := context.Background()
 
 		if err := kv.CreateWorkflow(ctx, *workflow); err != nil {
@@ -113,7 +119,7 @@ func TestWorkflowKVStorage(t *testing.T) {
 	t.Run("Create Duplicate Workflow", func(t *testing.T) {
 		ctx := context.Background()
 		workflowID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
-		workflow := model.NewWorkflow(workflowID, g)
+		workflow := model.NewWorkflow(workflowID, g, ts)
 		// Attempt to create a duplicate workflow.
 		err := kv.CreateWorkflow(ctx, *workflow)
 		if err == nil {
@@ -134,6 +140,29 @@ func TestWorkflowKVStorage(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "workflow not found") {
 			t.Errorf("expected error 'workflow not found', got %v", err.Error())
+		}
+	})
+
+	t.Run("Update next action time", func(t *testing.T) {
+		ctx := context.Background()
+
+		if w, err := kv.GetWorkflow(ctx, workflowID); err != nil {
+			t.Fatalf("failed to retrieve workflow: %v", err)
+		} else if w.NextActionAt.IsZero() {
+			t.Fatalf("expected next action time to be set, got zero value")
+		} else if w.NextActionAt.Sub(ts) > 1*time.Second {
+			t.Errorf("expected next action time to be %v, got %v", ts, w.NextActionAt)
+		}
+
+		if err := kv.UpdateTimeout(ctx, workflowID, 10*time.Second); err != nil {
+			t.Fatalf("failed to update timeout: %v", err)
+		}
+		w, err := kv.GetWorkflow(ctx, workflowID)
+		if err != nil {
+			t.Fatalf("failed to retrieve workflow: %v", err)
+		}
+		if w.NextActionAt.Sub(ts.Add(10*time.Second)) > 1*time.Second {
+			t.Errorf("expected next action time to be %v, got %v", ts.Add(10*time.Second), w.NextActionAt)
 		}
 	})
 }
