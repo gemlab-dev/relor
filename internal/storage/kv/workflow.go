@@ -32,6 +32,18 @@ func NewWorkflowStorage(path, bucketName string, now timeProvider) (*WorkflowSto
 	if err != nil {
 		return nil, fmt.Errorf("failed to open KV store: %v", err)
 	}
+
+	// Create bucket if it doesn't exist.
+	err = db.Update(func(tx *bolt.Tx) error {
+		if _, innerErr := tx.CreateBucketIfNotExists([]byte(bucketName)); innerErr != nil {
+			return fmt.Errorf("failed to create bucket: %v", innerErr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create bucket: %v", err)
+	}
+
 	return &WorkflowStorage{db: db, bucketName: bucketName, now: now}, nil
 }
 
@@ -42,9 +54,9 @@ func (w *WorkflowStorage) Close() error {
 func (s *WorkflowStorage) CreateWorkflow(ctx context.Context, w model.Workflow) error {
 	// TODO: Set the NextActionAt to the current time + actionDelay
 	return s.db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(s.bucketName))
-		if err != nil {
-			return fmt.Errorf("failed to create bucket: %v", err)
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return fmt.Errorf("bucket not found: %s", s.bucketName)
 		}
 
 		return s.saveNewWorkflow(b, w)
@@ -232,7 +244,7 @@ func (s *WorkflowStorage) loadWorkflow(b *bolt.Bucket, id uuid.UUID) (*model.Wor
 	}
 	data := b.Get(key)
 	if data == nil {
-		return nil, fmt.Errorf("workflow not found")
+		return nil, nil
 	}
 	var wpb pb.Workflow
 	err = protojson.Unmarshal(data, &wpb)

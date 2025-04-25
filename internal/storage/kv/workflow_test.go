@@ -1,4 +1,4 @@
-package kv_test
+package kv
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	pb "github.com/gemlab-dev/relor/gen/pb/graph"
 	"github.com/gemlab-dev/relor/internal/model"
 	"github.com/gemlab-dev/relor/internal/storage"
-	"github.com/gemlab-dev/relor/internal/storage/kv"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/encoding/prototext"
 )
@@ -32,7 +31,8 @@ func TestWorkflowKVStorage(t *testing.T) {
 		return ts
 	}
 
-	kv, err := kv.NewWorkflowStorage(tempFile.Name(), "testBucket", now)
+	const testBucket = "testBucket"
+	kv, err := NewWorkflowStorage(tempFile.Name(), testBucket, now)
 	if err != nil {
 		t.Fatalf("failed to initialize storage: %v", err)
 	}
@@ -60,10 +60,35 @@ func TestWorkflowKVStorage(t *testing.T) {
 
 	workflowID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
+	t.Run("Get Workflow before creating any workflows", func(t *testing.T) {
+		ctx := context.Background()
+		wf, err := kv.GetWorkflow(ctx, workflowID)
+		if err != nil {
+			t.Fatalf("failed to retrieve workflow: %v", err)
+		}
+		if wf != nil {
+			t.Fatalf("expected nil workflow, got %v", wf)
+		}
+	})
+
+	t.Run("Get Workflow with wrong bucket", func(t *testing.T) {
+		ctx := context.Background()
+		kv.bucketName = "wrongBucket"
+		wf, err := kv.GetWorkflow(ctx, workflowID)
+		if err == nil {
+			t.Fatalf("expected error for wrong bucket, got nil")
+		}
+		if wf != nil {
+			t.Fatalf("expected nil workflow, got %v", wf)
+		}
+	})
+	kv.bucketName = testBucket
+
 	t.Run("Create and Get Workflow", func(t *testing.T) {
 		workflow := model.NewWorkflow(workflowID, g, ts)
 		ctx := context.Background()
 
+		// This will create the bucket as well.
 		if err := kv.CreateWorkflow(ctx, *workflow); err != nil {
 			t.Fatalf("failed to create workflow: %v", err)
 		}
@@ -134,12 +159,12 @@ func TestWorkflowKVStorage(t *testing.T) {
 		ctx := context.Background()
 		nonExistentID := uuid.New()
 
-		_, err := kv.GetWorkflow(ctx, nonExistentID)
-		if err == nil {
-			t.Fatalf("expected error for non-existent workflow, got nil")
+		wf, err := kv.GetWorkflow(ctx, nonExistentID)
+		if err != nil {
+			t.Fatalf("failed to retrieve workflow: %v", err)
 		}
-		if !strings.Contains(err.Error(), "workflow not found") {
-			t.Errorf("expected error 'workflow not found', got %v", err.Error())
+		if wf != nil {
+			t.Fatalf("expected nil workflow, got %v", wf)
 		}
 	})
 
@@ -163,6 +188,15 @@ func TestWorkflowKVStorage(t *testing.T) {
 		}
 		if w.NextActionAt.Sub(ts.Add(10*time.Second)) > 1*time.Second {
 			t.Errorf("expected next action time to be %v, got %v", ts.Add(10*time.Second), w.NextActionAt)
+		}
+	})
+
+	t.Run("Update non-existent next action time", func(t *testing.T) {
+		ctx := context.Background()
+		nonExistentID := uuid.New()
+
+		if err := kv.UpdateTimeout(ctx, nonExistentID, 10*time.Second); err == nil {
+			t.Fatalf("expected error for non-existent workflow, got nil")
 		}
 	})
 }
