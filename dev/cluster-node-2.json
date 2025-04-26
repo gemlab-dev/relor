@@ -12,5 +12,8 @@
                 "port": 7946
             }
         ]
+    },
+    "storage": {
+        "path": "cluster-node-storage-2.db"
     }
 }

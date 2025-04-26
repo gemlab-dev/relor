@@ -21,7 +21,7 @@ type JobID struct {
 	ID             uuid.UUID
 	WorkflowID     uuid.UUID
 	WorkflowAction string
-	TransitionID   uuid.UUID
+	TransitionID   uint64
 }
 
 type Job struct {

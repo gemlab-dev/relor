@@ -8,6 +8,7 @@ import (
 	"github.com/gemlab-dev/relor/internal/graphviz"
 	"github.com/gemlab-dev/relor/internal/model"
 	"github.com/gemlab-dev/relor/internal/storage"
+	"github.com/gemlab-dev/relor/internal/storage/kv"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,10 +23,10 @@ type Server struct {
 	pb.UnimplementedWorkflowServiceServer
 
 	logger Logger
-	store  *storage.WorkflowStorage
+	store  *kv.WorkflowStorage
 }
 
-func New(l Logger, s *storage.WorkflowStorage) *Server {
+func New(l Logger, s *kv.WorkflowStorage) *Server {
 	return &Server{
 		logger: l,
 		store:  s,
@@ -65,17 +66,12 @@ func (s *Server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetResponse, e
 		return nil, status.Errorf(codes.Internal, "failed to get workflow: %v", err)
 	}
 
-	t, err := s.store.GetLatestTransition(ctx, id)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get latest transition: %v", err)
-	}
-
 	return &pb.GetResponse{
 		State: &pb.WorkflowState{
 			Status:      string(w.Status),
 			CurrentNode: w.CurrentNode(),
 		},
-		TransitionId: t.String(),
+		TransitionId: w.LastTransitionId(),
 	}, nil
 }
 
@@ -90,18 +86,10 @@ func (s *Server) Update(ctx context.Context, in *pb.UpdateRequest) (*pb.UpdateRe
 	if in.ResultLabel == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "result label is empty")
 	}
-	tid := uuid.Nil
-	if in.TransitionId != "" {
-		tid, err = uuid.Parse(in.TransitionId)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to parse transition id: %v", err)
-		}
-	}
-
 	na := storage.NextAction{
-		ID:                id,
-		Label:             in.ResultLabel,
-		CurrentTransition: tid,
+		ID:                  id,
+		Label:               in.ResultLabel,
+		LastKnownTransition: in.TransitionId,
 	}
 	if err := s.store.UpdateNextAction(ctx, na); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update next action: %v", err)
@@ -137,7 +125,7 @@ func (s *Server) History(ctx context.Context, in *pb.GetRequest) (*pb.HistoryRes
 		ith = ith.Next()
 	}
 
-	gv, err := graphviz.Dot(w, th)
+	gv, err := graphviz.Dot(*w, th)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to generate graphviz: %v", err)
 	}

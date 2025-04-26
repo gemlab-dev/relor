@@ -162,8 +162,17 @@ func (s *WorkflowStorage) UpdateNextAction(ctx context.Context, na storage.NextA
 		}
 		if len(nextLabels) == 0 {
 			wf.Status = model.WorkflowStatusCompleted
+			if err := s.updateSchedule(b, wf.ID, wf.NextActionAt, time.Time{}); err != nil {
+				return fmt.Errorf("failed to update schedule: %w", err)
+			}
+			wf.NextActionAt = time.Time{}
+		} else {
+			old := wf.NextActionAt
+			wf.NextActionAt = s.now().Add(actionDelay)
+			if err := s.updateSchedule(b, wf.ID, old, wf.NextActionAt); err != nil {
+				return fmt.Errorf("failed to update schedule: %w", err)
+			}
 		}
-		wf.NextActionAt = s.now().Add(actionDelay)
 
 		return s.saveWorkflow(b, *wf)
 	})
@@ -300,6 +309,10 @@ func (s *WorkflowStorage) GetNextWorkflows(ctx context.Context) ([]model.Workflo
 			if wf == nil {
 				continue
 			}
+			if wf.Status != model.WorkflowStatusRunning {
+				return fmt.Errorf("found schedule for inactive workflow: %v; key: %v", wf, k)
+			}
+
 			workflows = append(workflows, *wf)
 		}
 		return nil
@@ -398,26 +411,31 @@ func (s *WorkflowStorage) saveWorkflow(b *bolt.Bucket, w model.Workflow) error {
 
 func (s *WorkflowStorage) updateSchedule(b *bolt.Bucket, wid uuid.UUID, old, new time.Time) error {
 	if !old.IsZero() {
-		schKey, err := scheduleKey(wid, old)
+		k, err := scheduleKey(wid, old)
 		if err != nil {
 			return fmt.Errorf("failed to create old schedule key: %w", err)
 		}
-		if err := b.Delete(schKey); err != nil {
+
+		if d := b.Get(k); d == nil {
+			return fmt.Errorf("schedule entry not found: %s", k)
+		}
+
+		if err := b.Delete(k); err != nil {
 			return fmt.Errorf("failed to delete old schedule entry: %w", err)
 		}
 	}
 	if !new.IsZero() {
-		schKey, err := scheduleKey(wid, new)
+		k, err := scheduleKey(wid, new)
 		if err != nil {
 			return fmt.Errorf("failed to create new schedule key: %w", err)
 		}
-		schData, err := protojson.Marshal(&pb.Schedule{
+		v, err := protojson.Marshal(&pb.Schedule{
 			WorkflowId: wid.String(),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to marshal schedule proto: %v", err)
 		}
-		if err := b.Put(schKey, schData); err != nil {
+		if err := b.Put(k, v); err != nil {
 			return fmt.Errorf("failed to save schedule: %v", err)
 		}
 	}

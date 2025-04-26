@@ -21,6 +21,10 @@ message Cluster {
     repeated Address gossip_seed = 3;
 }
 
+message Storage {
+    string path = 1;
+}
+
 // Orchestrator service configuration.
 message Config {
     // Managament API port.
@@ -32,4 +36,7 @@ message Config {
     // Specify settings for a cluster mode.
     // If this value is not set, single node configuration is used.
     optional Cluster cluster = 3;
+
+    // Specify settings for a storage.
+    Storage storage = 4;
 }
