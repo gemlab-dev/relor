@@ -40,11 +40,6 @@ github.com/hashicorp/golang-lru/simplelru
 # github.com/hashicorp/memberlist v0.5.3
 ## explicit; go 1.20
 github.com/hashicorp/memberlist
-# github.com/lib/pq v1.10.9
-## explicit; go 1.13
-github.com/lib/pq
-github.com/lib/pq/oid
-github.com/lib/pq/scram
 # github.com/miekg/dns v1.1.64
 ## explicit; go 1.22.0
 github.com/miekg/dns

@@ -1,2 +1,0 @@
-DROP TABLE IF EXISTS transitions;
-DROP TABLE IF EXISTS workflows;

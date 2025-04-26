@@ -42,7 +42,6 @@ Local run requires `docker`.
 Single-node orchestrator:
 
 ```sh 
-make startpg
 ./bin/server --config=dev/single-node.json
 ```
 
