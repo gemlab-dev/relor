@@ -44,6 +44,11 @@ func TestWorkflowKVStorageOpenFailure(t *testing.T) {
 		if kv2 != nil {
 			t.Fatalf("expected nil storage instance, got %v", kv2)
 		}
+		defer func() {
+			if err := kv2.Close(); err != nil {
+				t.Errorf("failed to close storage: %v", err)
+			}
+		}()
 	})
 }
 
