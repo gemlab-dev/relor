@@ -16,17 +16,33 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const actionDelay = 1 * time.Second
+const (
+	actionDelay = 1 * time.Second
+)
+
+type index uint16
+
+const (
+	workflowIdx index = iota
+	scheduleIdx
+)
+
+func (i index) prefix() []byte {
+	p := make([]byte, 2)
+	binary.BigEndian.PutUint16(p, uint16(i))
+	return p
+}
 
 type timeProvider func() time.Time
 
 type WorkflowStorage struct {
-	db         *bolt.DB
-	bucketName string
-	now        timeProvider
+	db                *bolt.DB
+	bucketName        string
+	now               timeProvider
+	scheduleBatchSize int
 }
 
-func NewWorkflowStorage(path, bucketName string, now timeProvider) (*WorkflowStorage, error) {
+func NewWorkflowStorage(path, bucketName string, now timeProvider, scheduleBatchSize int) (*WorkflowStorage, error) {
 	opts := &bolt.Options{Timeout: 1 * time.Second}
 	db, err := bolt.Open(path, 0600, opts)
 	if err != nil {
@@ -44,7 +60,12 @@ func NewWorkflowStorage(path, bucketName string, now timeProvider) (*WorkflowSto
 		return nil, fmt.Errorf("failed to create bucket: %v", err)
 	}
 
-	return &WorkflowStorage{db: db, bucketName: bucketName, now: now}, nil
+	return &WorkflowStorage{
+		db:                db,
+		bucketName:        bucketName,
+		now:               now,
+		scheduleBatchSize: scheduleBatchSize,
+	}, nil
 }
 
 func (w *WorkflowStorage) Close() error {
@@ -57,6 +78,10 @@ func (s *WorkflowStorage) CreateWorkflow(ctx context.Context, w model.Workflow) 
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
 			return fmt.Errorf("bucket not found: %s", s.bucketName)
+		}
+
+		if err := s.updateSchedule(b, w.ID, time.Time{}, w.NextActionAt); err != nil {
+			return fmt.Errorf("failed to update schedule: %w", err)
 		}
 
 		return s.saveNewWorkflow(b, w)
@@ -228,13 +253,62 @@ func (s *WorkflowStorage) UpdateTimeout(ctx context.Context, id uuid.UUID, timeo
 			return fmt.Errorf("workflow not found: %s", id)
 		}
 
+		prevActionAt := wf.NextActionAt
 		wf.NextActionAt = s.now().Add(timeout).Add(actionDelay)
+
+		if err := s.updateSchedule(b, id, prevActionAt, wf.NextActionAt); err != nil {
+			return fmt.Errorf("failed to update schedule: %w", err)
+		}
 		return s.saveWorkflow(b, *wf)
 	})
 }
 
 func (s *WorkflowStorage) GetNextWorkflows(ctx context.Context) ([]model.Workflow, error) {
-	return nil, fmt.Errorf("not implemented")
+	var workflows []model.Workflow
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return fmt.Errorf("bucket not found: %s", s.bucketName)
+		}
+
+		c := b.Cursor()
+		prefix := scheduleIdx.prefix()
+		upperBound, err := SchedulePrefix(prefix, s.now())
+		if err != nil {
+			return fmt.Errorf("failed to create schedule prefix: %w", err)
+		}
+		condition := func(k []byte) bool {
+			return len(workflows) < s.scheduleBatchSize &&
+				k != nil &&
+				bytes.HasPrefix(k, prefix) &&
+				bytes.Compare(k, upperBound) <= 0
+		}
+		for k, v := c.Seek(prefix); condition(k); k, v = c.Next() {
+			var spb pb.Schedule
+			err := protojson.Unmarshal(v, &spb)
+			if err != nil {
+				return fmt.Errorf("failed to unmarshal schedule proto: %v", err)
+			}
+			wid, err := uuid.Parse(spb.WorkflowId)
+			if err != nil {
+				return fmt.Errorf("failed to parse workflow ID: %v", err)
+			}
+			wf, err := s.loadWorkflow(b, wid)
+			if err != nil {
+				return fmt.Errorf("failed to load workflow: %w", err)
+			}
+			if wf == nil {
+				continue
+			}
+			workflows = append(workflows, *wf)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next workflows: %w", err)
+	}
+
+	return workflows, nil
 }
 
 func (s *WorkflowStorage) loadWorkflow(b *bolt.Bucket, id uuid.UUID) (*model.Workflow, error) {
@@ -322,8 +396,36 @@ func (s *WorkflowStorage) saveWorkflow(b *bolt.Bucket, w model.Workflow) error {
 	return b.Put(key, data)
 }
 
+func (s *WorkflowStorage) updateSchedule(b *bolt.Bucket, wid uuid.UUID, old, new time.Time) error {
+	if !old.IsZero() {
+		schKey, err := scheduleKey(wid, old)
+		if err != nil {
+			return fmt.Errorf("failed to create old schedule key: %w", err)
+		}
+		if err := b.Delete(schKey); err != nil {
+			return fmt.Errorf("failed to delete old schedule entry: %w", err)
+		}
+	}
+	if !new.IsZero() {
+		schKey, err := scheduleKey(wid, new)
+		if err != nil {
+			return fmt.Errorf("failed to create new schedule key: %w", err)
+		}
+		schData, err := protojson.Marshal(&pb.Schedule{
+			WorkflowId: wid.String(),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to marshal schedule proto: %v", err)
+		}
+		if err := b.Put(schKey, schData); err != nil {
+			return fmt.Errorf("failed to save schedule: %v", err)
+		}
+	}
+	return nil
+}
+
 func workflowKey(id uuid.UUID) ([]byte, error) {
-	return WorkflowKey([]byte{}, id)
+	return WorkflowKey(workflowIdx.prefix(), id)
 }
 
 func transitionPrefix(id uuid.UUID) ([]byte, error) {
@@ -340,4 +442,8 @@ func transitionKey(id uuid.UUID, sequenceID uint64) ([]byte, error) {
 		return nil, fmt.Errorf("failed to create workflow key: %w", err)
 	}
 	return TransitionKey(b, sequenceID), nil
+}
+
+func scheduleKey(id uuid.UUID, when time.Time) ([]byte, error) {
+	return ScheduleKey(scheduleIdx.prefix(), when, id)
 }
