@@ -313,4 +313,21 @@ func TestWorkflowCompletion(t *testing.T) {
 	if len(wfs) != 0 {
 		t.Fatalf("expected no workflows, got %d", len(wfs))
 	}
+
+	wf, err := kvStore.GetWorkflow(ctx, workflowID)
+	if err != nil {
+		t.Fatalf("failed to get workflow: %v", err)
+	}
+	if wf == nil {
+		t.Fatalf("expected workflow, got nil")
+	}
+	if wf.Status != model.WorkflowStatusCompleted {
+		t.Fatalf("expected workflow status %s, got %s", model.WorkflowStatusCompleted, wf.Status)
+	}
+	if wf.LastTransitionId() != 2 {
+		t.Fatalf("expected last transition ID 2, got %d", wf.LastTransitionId())
+	}
+	if !wf.NextActionAt.IsZero() {
+		t.Fatalf("expected next action at zero, got %s", wf.NextActionAt)
+	}
 }

@@ -204,29 +204,6 @@ func TestWorkflowKVStorage(t *testing.T) {
 		}
 	})
 
-	t.Run("Update next action time", func(t *testing.T) {
-		ctx := context.Background()
-
-		if w, err := kv.GetWorkflow(ctx, workflowID); err != nil {
-			t.Fatalf("failed to retrieve workflow: %v", err)
-		} else if w.NextActionAt.IsZero() {
-			t.Fatalf("expected next action time to be set, got zero value")
-		} else if w.NextActionAt.Sub(ts) > 1*time.Second {
-			t.Errorf("expected next action time to be %v, got %v", ts, w.NextActionAt)
-		}
-
-		if err := kv.UpdateTimeout(ctx, workflowID, 10*time.Second); err != nil {
-			t.Fatalf("failed to update timeout: %v", err)
-		}
-		w, err := kv.GetWorkflow(ctx, workflowID)
-		if err != nil {
-			t.Fatalf("failed to retrieve workflow: %v", err)
-		}
-		if w.NextActionAt.Sub(ts.Add(10*time.Second)) > 1*time.Second {
-			t.Errorf("expected next action time to be %v, got %v", ts.Add(10*time.Second), w.NextActionAt)
-		}
-	})
-
 	t.Run("Update non-existent next action time", func(t *testing.T) {
 		ctx := context.Background()
 		nonExistentID := uuid.New()

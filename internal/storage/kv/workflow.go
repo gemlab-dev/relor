@@ -165,6 +165,7 @@ func (s *WorkflowStorage) UpdateNextAction(ctx context.Context, na storage.NextA
 			if err := s.updateSchedule(b, wf.ID, wf.NextActionAt, time.Time{}); err != nil {
 				return fmt.Errorf("failed to update schedule: %w", err)
 			}
+			wf.NextActionAt = time.Time{}
 		} else {
 			old := wf.NextActionAt
 			wf.NextActionAt = s.now().Add(actionDelay)
