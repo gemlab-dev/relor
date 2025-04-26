@@ -22,8 +22,6 @@ import (
 	"github.com/google/uuid"
 
 	configpb "github.com/gemlab-dev/relor/gen/pb/config"
-
-	_ "github.com/lib/pq"
 )
 
 var config = flag.String("config", "", "Path to the config file")
