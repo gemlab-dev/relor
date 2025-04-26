@@ -17,8 +17,7 @@ import (
 )
 
 const (
-	actionDelay     = 1 * time.Second
-	maxSchedulePage = 100
+	actionDelay = 1 * time.Second
 )
 
 type index uint16
@@ -37,12 +36,13 @@ func (i index) prefix() []byte {
 type timeProvider func() time.Time
 
 type WorkflowStorage struct {
-	db         *bolt.DB
-	bucketName string
-	now        timeProvider
+	db                *bolt.DB
+	bucketName        string
+	now               timeProvider
+	scheduleBatchSize int
 }
 
-func NewWorkflowStorage(path, bucketName string, now timeProvider) (*WorkflowStorage, error) {
+func NewWorkflowStorage(path, bucketName string, now timeProvider, scheduleBatchSize int) (*WorkflowStorage, error) {
 	opts := &bolt.Options{Timeout: 1 * time.Second}
 	db, err := bolt.Open(path, 0600, opts)
 	if err != nil {
@@ -60,7 +60,12 @@ func NewWorkflowStorage(path, bucketName string, now timeProvider) (*WorkflowSto
 		return nil, fmt.Errorf("failed to create bucket: %v", err)
 	}
 
-	return &WorkflowStorage{db: db, bucketName: bucketName, now: now}, nil
+	return &WorkflowStorage{
+		db:                db,
+		bucketName:        bucketName,
+		now:               now,
+		scheduleBatchSize: scheduleBatchSize,
+	}, nil
 }
 
 func (w *WorkflowStorage) Close() error {
@@ -272,9 +277,13 @@ func (s *WorkflowStorage) GetNextWorkflows(ctx context.Context) ([]model.Workflo
 		if err != nil {
 			return fmt.Errorf("failed to create schedule prefix: %w", err)
 		}
-		cnt := 0
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix) && bytes.Compare(k, upperBound) <= 0 && cnt < maxSchedulePage; k, v = c.Next() {
-			cnt++
+		condition := func(k []byte) bool {
+			return len(workflows) < s.scheduleBatchSize &&
+				k != nil &&
+				bytes.HasPrefix(k, prefix) &&
+				bytes.Compare(k, upperBound) <= 0
+		}
+		for k, v := c.Seek(prefix); condition(k); k, v = c.Next() {
 			var spb pb.Schedule
 			err := protojson.Unmarshal(v, &spb)
 			if err != nil {

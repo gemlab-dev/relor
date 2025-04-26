@@ -27,7 +27,7 @@ func TestWorkflowKVStorageOpenFailure(t *testing.T) {
 	}()
 
 	t.Run("Double open", func(t *testing.T) {
-		kv1, err := NewWorkflowStorage(tempFile.Name(), "testBucket", time.Now)
+		kv1, err := NewWorkflowStorage(tempFile.Name(), "testBucket", time.Now, 10)
 		if err != nil {
 			t.Fatalf("failed to initialize storage: %v", err)
 		}
@@ -37,7 +37,7 @@ func TestWorkflowKVStorageOpenFailure(t *testing.T) {
 			}
 		}()
 		// Attempt to open multiple instances of the same file.
-		kv2, err := NewWorkflowStorage(tempFile.Name(), "testBucket", time.Now)
+		kv2, err := NewWorkflowStorage(tempFile.Name(), "testBucket", time.Now, 10)
 		if err == nil {
 			t.Fatalf("expected error when opening multiple instances, got nil")
 		}
@@ -65,7 +65,7 @@ func TestWorkflowKVStorage(t *testing.T) {
 	}
 
 	const testBucket = "testBucket"
-	kv, err := NewWorkflowStorage(tempFile.Name(), testBucket, now)
+	kv, err := NewWorkflowStorage(tempFile.Name(), testBucket, now, 10)
 	if err != nil {
 		t.Fatalf("failed to initialize storage: %v", err)
 	}
