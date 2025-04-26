@@ -9,6 +9,7 @@ import (
 
 	pb "github.com/gemlab-dev/relor/gen/pb/graph"
 	"github.com/gemlab-dev/relor/internal/model"
+	"github.com/gemlab-dev/relor/internal/storage"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/encoding/prototext"
 )
@@ -213,5 +214,105 @@ func TestGetNextWorkflowsBatchSize(t *testing.T) {
 	}
 	if wfs[1].ID != uuid.MustParse("00000000-0000-0000-0000-000000000003") {
 		t.Fatalf("expected workflow ID %s, got %s", "00000000-0000-0000-0000-000000000003", wfs[1].ID)
+	}
+}
+
+func TestWorkflowCompletion(t *testing.T) {
+	tempFile, err := os.CreateTemp("", "testdb-*.db")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	defer func() {
+		if err := os.Remove(tempFile.Name()); err != nil {
+			t.Errorf("failed to remove temp file: %v", err)
+		}
+	}()
+
+	// Initialise the storage.
+	currentTime := time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC)
+	now := func() time.Time {
+		return currentTime
+	}
+	kvStore, err := NewWorkflowStorage(tempFile.Name(), "testBucket", now, 10)
+	if err != nil {
+		t.Fatalf("failed to initialize storage: %v", err)
+	}
+	defer func() {
+		if err := kvStore.Close(); err != nil {
+			t.Errorf("failed to close storage: %v", err)
+		}
+	}()
+
+	gpb := &pb.Graph{}
+	if err := prototext.Unmarshal([]byte(graphTxt), gpb); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	g := &model.Graph{}
+	if err := g.FromProto(gpb); err != nil {
+		t.Fatalf("failed to load graph: %v", err)
+	}
+
+	ctx := context.Background()
+
+	wfs, err := kvStore.GetNextWorkflows(ctx)
+	if err != nil {
+		t.Fatalf("failed to get next workflows: %v", err)
+	}
+	if len(wfs) != 0 {
+		t.Fatalf("expected no workflows, got %d", len(wfs))
+	}
+
+	workflowID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	startTime := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC) // Set past start time
+	workflow := model.NewWorkflow(workflowID, g, startTime)
+	if err := kvStore.CreateWorkflow(ctx, *workflow); err != nil {
+		t.Fatalf("failed to create workflow: %v", err)
+	}
+
+	wfs, err = kvStore.GetNextWorkflows(ctx)
+	if err != nil {
+		t.Fatalf("failed to get next workflows: %v", err)
+	}
+	if len(wfs) != 1 {
+		t.Fatalf("expected 1 workflow, got %d", len(wfs))
+	}
+
+	if err := kvStore.UpdateTimeout(ctx, workflowID, 1*time.Minute); err != nil {
+		t.Fatalf("failed to update timeout: %v", err)
+	}
+	na := storage.NextAction{
+		ID:                  workflowID,
+		Label:               "retry",
+		LastKnownTransition: 0,
+	}
+	if err := kvStore.UpdateNextAction(ctx, na); err != nil {
+		t.Fatalf("failed to update next action: %v", err)
+	}
+
+	currentTime = currentTime.Add(2 * time.Minute)
+	wfs, err = kvStore.GetNextWorkflows(ctx)
+	if err != nil {
+		t.Fatalf("failed to get next workflows: %v", err)
+	}
+	if len(wfs) != 1 {
+		t.Fatalf("expected 1 workflow, got %d", len(wfs))
+	}
+
+	if err := kvStore.UpdateTimeout(ctx, workflowID, 1*time.Minute); err != nil {
+		t.Fatalf("failed to update timeout: %v", err)
+	}
+	na.Label = "ok"
+	na.LastKnownTransition = 1
+	if err := kvStore.UpdateNextAction(ctx, na); err != nil {
+		t.Fatalf("failed to update next action: %v", err)
+	}
+
+	currentTime = currentTime.Add(2 * time.Minute)
+	wfs, err = kvStore.GetNextWorkflows(ctx)
+	if err != nil {
+		t.Fatalf("failed to get next workflows: %v", err)
+	}
+	if len(wfs) != 0 {
+		t.Fatalf("expected no workflows, got %d", len(wfs))
 	}
 }

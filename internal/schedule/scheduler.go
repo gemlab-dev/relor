@@ -9,6 +9,7 @@ import (
 	pb "github.com/gemlab-dev/relor/gen/pb/api"
 	"github.com/gemlab-dev/relor/internal/model"
 	"github.com/gemlab-dev/relor/internal/storage"
+	"github.com/gemlab-dev/relor/internal/storage/kv"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,14 +27,14 @@ type Logger interface {
 }
 
 type Scheduler struct {
-	wfStore        *storage.WorkflowStorage
+	wfStore        *kv.WorkflowStorage
 	jobClient      pb.JobServiceClient
 	logger         Logger
 	workerName     string
 	jobServiceAddr string
 }
 
-func New(wfStore *storage.WorkflowStorage, l Logger, jobSrvAddr string) *Scheduler {
+func New(wfStore *kv.WorkflowStorage, l Logger, jobSrvAddr string) *Scheduler {
 	return &Scheduler{
 		wfStore:        wfStore,
 		logger:         l,
@@ -84,18 +85,10 @@ func (s *Scheduler) Run(ctx context.Context) error {
 				s.logger.ErrorContext(ctx, "failed to parse workflow ID", "err", err)
 				continue
 			}
-			tid := uuid.Nil
-			if resp.Reference.TransitionId != "" {
-				tid, err = uuid.Parse(resp.Reference.TransitionId)
-				if err != nil {
-					s.logger.ErrorContext(ctx, "failed to parse transition ID", "err", err)
-					continue
-				}
-			}
 			na := storage.NextAction{
-				ID:                wfID,
-				Label:             resp.ResultLabel,
-				CurrentTransition: tid,
+				ID:                  wfID,
+				Label:               resp.ResultLabel,
+				LastKnownTransition: resp.Reference.TransitionId,
 			}
 			if err := s.wfStore.UpdateNextAction(listener.Context(), na); err != nil {
 				s.logger.ErrorContext(ctx, "failed to update next workflow action", "err", err)
@@ -150,19 +143,13 @@ func (s *Scheduler) schedule(ctx context.Context, w model.Workflow) error {
 		return fmt.Errorf("failed to update timeout: %w", err)
 	}
 
-	// Get the latest transition ID.
-	tid, err := s.wfStore.GetLatestTransition(ctx, w.ID)
-	if err != nil {
-		return fmt.Errorf("failed to get latest transition: %w", err)
-	}
-
 	// Schedule the next action.
 	jcp := &pb.CreateRequest{
 		Id: uuid.NewString(),
 		Reference: &pb.Reference{
 			WorkflowId:     w.ID.String(),
 			WorkflowAction: w.CurrentNode(),
-			TransitionId:   tid.String(),
+			TransitionId:   w.LastTransitionId(),
 		},
 		ResultLabels: labels,
 		Ttl:          durationpb.New(timeout),

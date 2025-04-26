@@ -2,22 +2,22 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"log/slog"
 	"os"
+	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/gemlab-dev/relor/gen/sqlc"
 	"github.com/gemlab-dev/relor/internal/gossip"
 	"github.com/gemlab-dev/relor/internal/job"
 	"github.com/gemlab-dev/relor/internal/schedule"
 	"github.com/gemlab-dev/relor/internal/server"
 	"github.com/gemlab-dev/relor/internal/storage"
+	"github.com/gemlab-dev/relor/internal/storage/kv"
 	"github.com/gemlab-dev/relor/internal/workflow"
 	"github.com/google/uuid"
 
@@ -53,12 +53,19 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	conn, err := sql.Open("postgres", "user=root dbname=workflow password=secret sslmode=disable")
-	if err != nil {
-		log.Fatalf("failed to open db connection: %v", err)
+	if cfg.GetStorage() == nil {
+		log.Fatal("storage config is required")
 	}
-	defer conn.Close()
-	wfStore := storage.NewWorkflowStorage(sqlc.New(), conn)
+	wfStore, err := kv.NewWorkflowStorage(cfg.GetStorage().Path, "workflow", time.Now, 10)
+	if err != nil {
+		log.Fatalf("failed to create workflow storage: %v", err)
+	}
+	defer func() {
+		if err := wfStore.Close(); err != nil {
+			log.Fatalf("failed to close workflow storage: %v", err)
+		}
+	}()
+
 	jobStore := storage.NewJobStorage()
 
 	ctx, cancel := context.WithCancel(context.Background())

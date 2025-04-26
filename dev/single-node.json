@@ -3,5 +3,8 @@
     "job_service_addr": {
         "hostname": "localhost",
         "port": 50051
+    },
+    "storage": {
+        "path": "single-node-storage.db"
     }
 }

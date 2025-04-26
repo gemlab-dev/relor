@@ -58,18 +58,12 @@ func (s *Server) Create(ctx context.Context, in *pb.CreateRequest) (*pb.CreateRe
 	if len(in.ResultLabels) == 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "result labels are empty")
 	}
-	tid := uuid.Nil
-	if r.TransitionId != "" {
-		tid, err = uuid.Parse(r.TransitionId)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to parse transition id: %v", err)
-		}
-	}
+
 	jid := model.JobID{
 		ID:             id,
 		WorkflowID:     wid,
 		WorkflowAction: r.WorkflowAction,
-		TransitionID:   tid,
+		TransitionID:   in.Reference.TransitionId,
 	}
 	j := model.NewJob(jid, in.ResultLabels, time.Now(), in.Ttl.AsDuration())
 	if err := s.jobs.Save(j); err != nil {
@@ -184,7 +178,7 @@ func (s *Server) Listen(in *pb.ListenRequest, stream pb.JobService_ListenServer)
 					Reference: &pb.Reference{
 						WorkflowId:     j.ID().WorkflowID.String(),
 						WorkflowAction: j.ID().WorkflowAction,
-						TransitionId:   j.ID().TransitionID.String(),
+						TransitionId:   j.ID().TransitionID,
 					},
 					AvailableLabels: j.Labels().Slice(),
 					ResultLabel:     j.ResultLabel(),
