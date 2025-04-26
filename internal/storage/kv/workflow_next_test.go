@@ -156,6 +156,14 @@ func TestGetNextWorkflowsBatchSize(t *testing.T) {
 		}
 	}()
 
+	wfs, err := kvStore.GetNextWorkflows(context.Background())
+	if err != nil {
+		t.Fatalf("failed to get next workflows: %v", err)
+	}
+	if len(wfs) != 0 {
+		t.Fatalf("expected no workflows, got %d", len(wfs))
+	}
+
 	gpb := &pb.Graph{}
 	if err := prototext.Unmarshal([]byte(graphTxt), gpb); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
@@ -175,7 +183,7 @@ func TestGetNextWorkflowsBatchSize(t *testing.T) {
 		}
 	}
 	ctx := context.Background()
-	wfs, err := kvStore.GetNextWorkflows(ctx)
+	wfs, err = kvStore.GetNextWorkflows(ctx)
 	if err != nil {
 		t.Fatalf("failed to get next workflows: %v", err)
 	}
@@ -187,5 +195,23 @@ func TestGetNextWorkflowsBatchSize(t *testing.T) {
 	}
 	if wfs[1].ID != uuid.MustParse("00000000-0000-0000-0000-000000000002") {
 		t.Fatalf("expected workflow ID %s, got %s", "00000000-0000-0000-0000-000000000002", wfs[1].ID)
+	}
+
+	err = kvStore.UpdateTimeout(ctx, uuid.MustParse("00000000-0000-0000-0000-000000000001"), 23*time.Hour)
+	if err != nil {
+		t.Fatalf("failed to update timeout: %v", err)
+	}
+	wfs, err = kvStore.GetNextWorkflows(ctx)
+	if err != nil {
+		t.Fatalf("failed to get next workflows: %v", err)
+	}
+	if len(wfs) != 2 {
+		t.Fatalf("expected 2 workflows, got %d", len(wfs))
+	}
+	if wfs[0].ID != uuid.MustParse("00000000-0000-0000-0000-000000000002") {
+		t.Fatalf("expected workflow ID %s, got %s", "00000000-0000-0000-0000-000000000002", wfs[0].ID)
+	}
+	if wfs[1].ID != uuid.MustParse("00000000-0000-0000-0000-000000000003") {
+		t.Fatalf("expected workflow ID %s, got %s", "00000000-0000-0000-0000-000000000003", wfs[1].ID)
 	}
 }
