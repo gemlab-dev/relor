@@ -142,7 +142,6 @@ func TestGetNextWorkflowsBatchSize(t *testing.T) {
 		}
 	}()
 
-	// Initialise the storage.
 	currentTime := time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC)
 	now := func() time.Time {
 		return currentTime
@@ -228,7 +227,6 @@ func TestWorkflowCompletion(t *testing.T) {
 		}
 	}()
 
-	// Initialise the storage.
 	currentTime := time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC)
 	now := func() time.Time {
 		return currentTime
