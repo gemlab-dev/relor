@@ -66,6 +66,10 @@ func (s *Server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetResponse, e
 		return nil, status.Errorf(codes.Internal, "failed to get workflow: %v", err)
 	}
 
+	if w == nil {
+		return nil, status.Errorf(codes.NotFound, "workflow not found")
+	}
+
 	return &pb.GetResponse{
 		State: &pb.WorkflowState{
 			Status:      string(w.Status),

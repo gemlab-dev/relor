@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,23 +20,32 @@ type Logger interface {
 	ErrorContext(ctx context.Context, msg string, args ...any)
 }
 
+type GraphvizHandler interface {
+	ServeHTTP(w http.ResponseWriter, r *http.Request)
+}
+
 type Notify func(c chan<- os.Signal, sig ...os.Signal)
 
 type Server struct {
-	logger Logger
-	port   int
-	notify Notify
-	wfs    pb.WorkflowServiceServer
-	js     pb.JobServiceServer
+	logger  Logger
+	port    int
+	notify  Notify
+	httpMux *http.ServeMux
+	wfs     pb.WorkflowServiceServer
+	js      pb.JobServiceServer
 }
 
-func New(port int, logger Logger, wfs pb.WorkflowServiceServer, js pb.JobServiceServer) *Server {
+func New(port int, logger Logger, wfs pb.WorkflowServiceServer, js pb.JobServiceServer, gh GraphvizHandler) *Server {
+	mux := http.NewServeMux()
+	mux.Handle("/graph/", http.StripPrefix("/graph", gh))
+
 	return &Server{
-		logger: logger,
-		port:   port,
-		notify: signal.Notify,
-		wfs:    wfs,
-		js:     js,
+		logger:  logger,
+		port:    port,
+		notify:  signal.Notify,
+		httpMux: mux,
+		wfs:     wfs,
+		js:      js,
 	}
 }
 
@@ -67,6 +77,18 @@ func (s Server) Serve(ctx context.Context) error {
 			errChan <- err
 		}
 	}()
+
+	s.logger.InfoContext(ctx, "Starting HTTP server", "port", 8080)
+	httpSrv := http.Server{
+		Addr:    ":8080",
+		Handler: s.httpMux,
+	}
+	go func() {
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errChan <- fmt.Errorf("HTTP server failed: %w", err)
+		}
+	}()
+	defer httpSrv.Shutdown(ctx)
 
 	select {
 	case err := <-errChan:
