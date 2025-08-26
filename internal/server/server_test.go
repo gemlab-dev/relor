@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"sync"
 	"syscall"
@@ -29,11 +30,17 @@ func (l *loggerMock) ErrorContext(ctx context.Context, msg string, args ...any) 
 	l.lastErrMsg = msg
 }
 
+type mockGraphvizHandler struct{}
+
+func (m *mockGraphvizHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
 func TestShutdownWithCtxCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	logger := &loggerMock{}
-	srv := New(8080, logger, &workflow.Server{}, &job.Server{})
+	srv := New(8080, logger, &workflow.Server{}, &job.Server{}, &mockGraphvizHandler{})
 	go srv.Serve(ctx)
 
 	cancel()
@@ -58,7 +65,7 @@ func TestShutdownWithSignal(t *testing.T) {
 	defer cancel()
 
 	logger := &loggerMock{}
-	srv := New(8080, logger, &workflow.Server{}, &job.Server{})
+	srv := New(8080, logger, &workflow.Server{}, &job.Server{}, &mockGraphvizHandler{})
 	srv.notify = func(c chan<- os.Signal, sig ...os.Signal) {
 		c <- syscall.SIGTERM
 	}
@@ -85,7 +92,7 @@ func TestShutdownWithError(t *testing.T) {
 	defer cancel()
 
 	logger := &loggerMock{}
-	srv := New(-8080, logger, &workflow.Server{}, &job.Server{}) // invalid port
+	srv := New(-8080, logger, &workflow.Server{}, &job.Server{}, &mockGraphvizHandler{}) // invalid port
 
 	go srv.Serve(ctx)
 

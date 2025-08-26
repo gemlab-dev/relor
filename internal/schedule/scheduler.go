@@ -115,6 +115,9 @@ func (s *Scheduler) poll(ctx context.Context) error {
 				s.logger.ErrorContext(ctx, "failed to list workflows", "err", err)
 				continue
 			}
+			if len(wfs) > 0 {
+				s.logger.InfoContext(ctx, "Found workflows to schedule", "count", len(wfs))
+			}
 			for _, w := range wfs {
 				if err := s.schedule(ctx, w); err != nil {
 					s.logger.ErrorContext(ctx, "failed to schedule", "err", err)

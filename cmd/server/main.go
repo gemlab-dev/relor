@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/gemlab-dev/relor/internal/gossip"
+	"github.com/gemlab-dev/relor/internal/graphviz"
 	"github.com/gemlab-dev/relor/internal/job"
 	"github.com/gemlab-dev/relor/internal/schedule"
 	"github.com/gemlab-dev/relor/internal/server"
@@ -91,6 +92,7 @@ func main() {
 	wfs := workflow.New(logger, wfStore)
 	// TODO: Job service should be a separate service.
 	js := job.New(logger, jobStore)
+	gh := graphviz.NewHandler(logger, wfStore, graphviz.RenderSVG)
 
 	jaddr := cfg.GetJobServiceAddr()
 	if jaddr == nil {
@@ -100,7 +102,7 @@ func main() {
 	sch := schedule.New(wfStore, logger, jobServiceAddr)
 	go sch.Run(ctx)
 
-	srv := server.New(int(cfg.GetApiPort()), logger, wfs, js)
+	srv := server.New(int(cfg.GetApiPort()), logger, wfs, js, gh)
 	if err := srv.Serve(ctx); err != nil {
 		logger.ErrorContext(ctx, "Error serving", "err", err)
 	}

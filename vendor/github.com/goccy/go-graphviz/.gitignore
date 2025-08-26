@@ -1,0 +1,7 @@
+*.o
+*.svg
+*.png
+*.jpg
+.DS_Store
+bin
+internal/wasm/build/graphviz
