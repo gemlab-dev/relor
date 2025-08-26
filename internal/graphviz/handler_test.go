@@ -22,14 +22,15 @@ func (m *mockLogger) ErrorContext(ctx context.Context, msg string, args ...any) 
 
 // mockWorkflowStorage implements the WorkflowStorage interface for testing.
 type mockWorkflowStorage struct {
-	workflow    *model.Workflow
-	history     *model.Transition
-	returnError error
+	workflow         *model.Workflow
+	history          *model.Transition
+	getWorkflowError error
+	getHistoryError  error
 }
 
 func (m *mockWorkflowStorage) GetWorkflow(ctx context.Context, id uuid.UUID) (*model.Workflow, error) {
-	if m.returnError != nil {
-		return nil, m.returnError
+	if m.getWorkflowError != nil {
+		return nil, m.getWorkflowError
 	}
 	if m.workflow != nil && m.workflow.ID == id {
 		return m.workflow, nil
@@ -38,13 +39,23 @@ func (m *mockWorkflowStorage) GetWorkflow(ctx context.Context, id uuid.UUID) (*m
 }
 
 func (m *mockWorkflowStorage) GetHistory(ctx context.Context, id uuid.UUID) (*model.Transition, error) {
-	if m.returnError != nil {
-		return nil, m.returnError
+	if m.getHistoryError != nil {
+		return nil, m.getHistoryError
 	}
 	if m.history != nil {
 		return m.history, nil
 	}
 	return model.NewTransitionHistory(time.Time{}, nil) // Return empty history
+}
+
+// mockRender is a mock implementation of the GraphRenderer for testing.
+func mockRender(errToReturn error) GraphRenderer {
+	return func(ctx context.Context, workflow model.Workflow, th *model.Transition) ([]byte, error) {
+		if errToReturn != nil {
+			return nil, errToReturn
+		}
+		return []byte("<svg>mock</svg>"), nil
+	}
 }
 
 func TestGraphvizHandler(t *testing.T) {
@@ -82,6 +93,7 @@ func TestGraphvizHandler(t *testing.T) {
 		method                string
 		url                   string
 		storage               *mockWorkflowStorage
+		renderer              GraphRenderer
 		expectedStatus        int
 		expectedBodyToContain string
 	}{
@@ -90,14 +102,16 @@ func TestGraphvizHandler(t *testing.T) {
 			method:                http.MethodGet,
 			url:                   "/" + workflowID.String(),
 			storage:               &mockWorkflowStorage{workflow: successWorkflow, history: successHistory},
+			renderer:              mockRender(nil),
 			expectedStatus:        http.StatusOK,
-			expectedBodyToContain: "<svg",
+			expectedBodyToContain: "<svg>mock</svg>",
 		},
 		{
 			name:           "Method Not Allowed",
 			method:         http.MethodPost,
 			url:            "/" + workflowID.String(),
 			storage:        &mockWorkflowStorage{},
+			renderer:       mockRender(nil),
 			expectedStatus: http.StatusMethodNotAllowed,
 		},
 		{
@@ -105,6 +119,7 @@ func TestGraphvizHandler(t *testing.T) {
 			method:                http.MethodGet,
 			url:                   "/not-a-uuid",
 			storage:               &mockWorkflowStorage{},
+			renderer:              mockRender(nil),
 			expectedStatus:        http.StatusBadRequest,
 			expectedBodyToContain: "Invalid workflow ID format",
 		},
@@ -113,14 +128,32 @@ func TestGraphvizHandler(t *testing.T) {
 			method:         http.MethodGet,
 			url:            "/" + uuid.NewString(), // A different, non-existent UUID
 			storage:        &mockWorkflowStorage{workflow: successWorkflow},
+			renderer:       mockRender(nil),
 			expectedStatus: http.StatusNotFound,
 		},
 		{
 			name:           "Storage Error on GetWorkflow",
 			method:         http.MethodGet,
 			url:            "/" + workflowID.String(),
-			storage:        &mockWorkflowStorage{returnError: errors.New("db is down")},
-			expectedStatus: http.StatusNotFound, // Not found is returned for any GetWorkflow error
+			storage:        &mockWorkflowStorage{getWorkflowError: errors.New("db is down")},
+			renderer:       mockRender(nil),
+			expectedStatus: http.StatusInternalServerError,
+		},
+		{
+			name:           "Storage Error on GetHistory",
+			method:         http.MethodGet,
+			url:            "/" + workflowID.String(),
+			storage:        &mockWorkflowStorage{workflow: successWorkflow, getHistoryError: errors.New("db is down")},
+			renderer:       mockRender(nil),
+			expectedStatus: http.StatusInternalServerError,
+		},
+		{
+			name:           "Render Error",
+			method:         http.MethodGet,
+			url:            "/" + workflowID.String(),
+			storage:        &mockWorkflowStorage{workflow: successWorkflow, history: successHistory},
+			renderer:       mockRender(errors.New("render failed")),
+			expectedStatus: http.StatusInternalServerError,
 		},
 	}
 
@@ -129,7 +162,7 @@ func TestGraphvizHandler(t *testing.T) {
 			// Arrange
 			req := httptest.NewRequest(tc.method, tc.url, nil)
 			rr := httptest.NewRecorder()
-			handler := NewHandler(&mockLogger{}, tc.storage)
+			handler := NewHandler(&mockLogger{}, tc.storage, tc.renderer)
 
 			// Act
 			handler.ServeHTTP(rr, req)

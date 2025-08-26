@@ -24,15 +24,20 @@ type WorkflowStorage interface {
 	GetHistory(ctx context.Context, id uuid.UUID) (*model.Transition, error)
 }
 
+// GraphRenderer defines the function signature for rendering a graph.
+type GraphRenderer func(ctx context.Context, workflow model.Workflow, th *model.Transition) ([]byte, error)
+
 type Handler struct {
 	wfStore WorkflowStorage
 	logger  Logger
+	render  GraphRenderer
 }
 
-func NewHandler(logger Logger, wfStore WorkflowStorage) *Handler {
+func NewHandler(logger Logger, wfStore WorkflowStorage, render GraphRenderer) *Handler {
 	return &Handler{
 		wfStore: wfStore,
 		logger:  logger,
+		render:  render,
 	}
 }
 
@@ -65,10 +70,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	workflow, err := h.wfStore.GetWorkflow(r.Context(), wid)
 	if err != nil {
 		h.logger.ErrorContext(r.Context(), "Failed to get workflow", "err", err, "id", wid)
-		http.Error(w, "Workflow not found", http.StatusNotFound)
+		http.Error(w, "Failed to retrieve workflow", http.StatusInternalServerError)
 		return
 	}
-
 	if workflow == nil {
 		http.Error(w, "Workflow not found", http.StatusNotFound)
 		return
@@ -82,19 +86,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate Graphviz DOT representation
-	dotContent, err := Dot(*workflow, th)
+	// Generate and render the graph
+	svg, err := h.render(r.Context(), *workflow, th)
 	if err != nil {
-		h.logger.ErrorContext(r.Context(), "Failed to generate graphviz", "err", err, "id", wid)
+		h.logger.ErrorContext(r.Context(), "Failed to render graph", "err", err, "id", wid)
 		http.Error(w, "Failed to generate graph", http.StatusInternalServerError)
-		return
-	}
-
-	// Convert DOT to SVG
-	svg, err := h.dotToSVG(r.Context(), dotContent)
-	if err != nil {
-		h.logger.ErrorContext(r.Context(), "Failed to convert DOT to SVG", "err", err)
-		http.Error(w, "Failed to generate SVG", http.StatusInternalServerError)
 		return
 	}
 
@@ -103,30 +99,37 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 
 	// Write SVG response
-	_, err = w.Write([]byte(svg))
+	_, err = w.Write(svg)
 	if err != nil {
 		h.logger.ErrorContext(r.Context(), "Failed to write SVG response", "err", err)
 	}
 }
 
-// dotToSVG converts DOT format to SVG using goccy/go-graphviz library
-func (h *Handler) dotToSVG(ctx context.Context, dotContent string) (string, error) {
+// RenderSVG generates a DOT representation of the workflow and renders it as an SVG.
+func RenderSVG(ctx context.Context, workflow model.Workflow, th *model.Transition) ([]byte, error) {
+	// Generate Graphviz DOT representation
+	dotContent, err := Dot(workflow, th)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate graphviz: %w", err)
+	}
+
+	// Convert DOT to SVG
 	g, err := graphviz.New(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to create graphviz instance: %w", err)
+		return nil, fmt.Errorf("failed to create graphviz instance: %w", err)
 	}
 	defer g.Close()
 
 	graph, err := graphviz.ParseBytes([]byte(dotContent))
 	if err != nil {
-		return "", fmt.Errorf("failed to parse DOT: %w", err)
+		return nil, fmt.Errorf("failed to parse DOT: %w", err)
 	}
 	defer graph.Close()
 
 	var buf bytes.Buffer
 	if err := g.Render(ctx, graph, graphviz.SVG, &buf); err != nil {
-		return "", fmt.Errorf("failed to render SVG: %w", err)
+		return nil, fmt.Errorf("failed to render SVG: %w", err)
 	}
 
-	return buf.String(), nil
+	return buf.Bytes(), nil
 }

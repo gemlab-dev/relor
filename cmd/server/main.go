@@ -92,7 +92,7 @@ func main() {
 	wfs := workflow.New(logger, wfStore)
 	// TODO: Job service should be a separate service.
 	js := job.New(logger, jobStore)
-	gh := graphviz.NewHandler(logger, wfStore)
+	gh := graphviz.NewHandler(logger, wfStore, graphviz.RenderSVG)
 
 	jaddr := cfg.GetJobServiceAddr()
 	if jaddr == nil {
