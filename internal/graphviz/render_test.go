@@ -90,3 +90,17 @@ func TestRenderSVG(t *testing.T) {
 		t.Error("finish edge not found in SVG")
 	}
 }
+
+func TestRenderSVG_NilGraph(t *testing.T) {
+	// 1. Setup a workflow with a nil graph
+	workflow := model.NewWorkflow(uuid.New(), nil, time.Now())
+	history, _ := model.NewTransitionHistory(time.Now(), nil)
+
+	// 2. Call RenderSVG
+	_, err := RenderSVG(context.Background(), *workflow, history)
+
+	// 3. Assert that an error is returned
+	if err == nil {
+		t.Fatal("RenderSVG should have returned an error for a nil graph, but it didn't")
+	}
+}
